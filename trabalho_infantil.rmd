@@ -1,0 +1,281 @@
+---
+title: "Trabalho Infantil"
+subtitle: "Análise do Trabalho Infantil"
+author: "Matheus Canhete, Felipe Paiva e Karina Reis"
+output:
+  flexdashboard::flex_dashboard:
+    theme: cosmo
+    css: style.css
+    logo: ./fig/logouf.png
+    orientation: columns
+    vertical_layout: fill
+---
+
+```{r setup, include = F}
+library(flexdashboard)
+library(highcharter)
+library(tidyverse)
+library(rio)
+library(plotly)
+library(kableExtra)
+library(DT)
+library(knitr)
+library(RColorBrewer)
+options(knitr.kable.NA = "--") # troca os NAN do kable
+```
+
+# Resultado
+
+Column {data-width=350 .tabset}
+------------------------
+
+### Distribuição por idade e sexo
+
+```{r tabela1, echo = F}
+# V8005 = idade
+# V0302 = sexo
+# V4746 = situacao ocupacao 5 anos ou mais
+# V4742 = rendimento mensal domiciliar per capita
+# V4812 = atividade crianças maiores de 5
+# V4805 = condição ocupação 10 anos ou mais
+# V9001 = trabalhou na semana
+# V9058 = numero de horas habitualmente trabalhada
+# V4809 = grupos atividade principal 
+
+dados <- import("./2015/pes_5_15.Rds") %>% select(V8005, V0302, V4746, V4812, V4805, V4742,
+                                                  V9001, V9058, V4809, nmr_irmaos,
+                                                  filhos_domicilio, educacao_pref)
+pt1.tabela1 <- dados %>%
+  dplyr::filter(V4746 == 1 & V8005 <= 10) %>% # filtrando as crianças ocupadas de 5 a 10
+  group_by(V4809, V0302) %>% # atividade desempenhada
+  summarise(percental_5_10 = n()/nrow(.)*100) %>%
+  ungroup()
+
+pt2.tabela1 <- dados %>%
+  dplyr::filter(V4746 == 1 & V8005 >= 11 & V8005 <= 15) %>% # filtrando as crianças ocupadas de 11 a 15
+  group_by(V4809, V0302) %>% # atividade desempenhada
+  summarise(percental_11_15 = n()/nrow(.)*100) %>%
+  ungroup()
+
+pt3.tabela1 <- dados %>%
+  dplyr::filter(V4746 == 1) %>% # filtrando as crianças ocupadas de 5 a 15
+  group_by(V4809, V0302) %>% # atividade desempenhada
+  summarise(percental_5_15 = n()/nrow(.)*100) %>%
+  ungroup()                                                  
+
+tabela1 <- right_join(pt1.tabela1, pt2.tabela1) %>%  # merge das três partes
+  right_join(., pt3.tabela1) %>%
+  rename(atividade = V4809, sexo = V0302) 
+
+# troca os valores por strings 
+tabela1$sexo <- if_else(tabela1$sexo == 2, "masculino", "feminino")
+
+tabela1$atividade <- factor(tabela1$atividade, levels = c(1,2,3,4,5,6,7,8,9,10,11,12,13),
+                            labels = c("Agrícola", "Outras atividades industriais", 
+                                       "Indústria de transformação", "Construção", "Comércio e reparação", 
+                                       "Alojamento", "Transporte", "Administração pública", "Serviços sociais",
+                                       "Serviços doméstico", "Outros serviços coletivos", "Outras atividades", "Atividades maldefinidas"))
+
+tabela1 %>% 
+  set_names(c("Atividade","Sexo", "Entre 5 a 10 anos", "Entre 11 a 15 anos", "Entre 5 a 15 anos")) %>% 
+  datatable(options = list(pageLength = 20, dom = "Bfrtip", buttons = c("csv", "pdf")),
+            class = "hover",
+            rownames = F, 
+            extensions = "Buttons") %>% 
+  formatRound(columns = c("Entre 5 a 10 anos", "Entre 11 a 15 anos", "Entre 5 a 15 anos"), digits = 2)
+```
+
+### Horas trabalhadas
+
+```{r tabela2, echo = F}
+pt1.tabela2 <- dados %>%
+  dplyr::filter(V4746 == 1 & V8005 <= 10) %>% # filtrando as crianças ocupadas de 5 a 10
+  group_by(V4809) %>% # atividade desempenhada
+  summarise(horas_trabalhadas_5_10 = mean(V9058)) %>%
+  ungroup()
+
+pt2.tabela2 <- dados %>%
+  dplyr::filter(V4746 == 1 & V8005 >= 11 & V8005 <= 15) %>% # filtrando as crianças ocupadas de 11 a 15
+  group_by(V4809) %>% # atividade desempenhada
+  summarise(horas_trabalhadas_11_15 = mean(V9058)) %>%
+  ungroup()
+
+pt3.tabela2 <- dados %>%
+  dplyr::filter(V4746 == 1) %>% # filtrando as crianças ocupadas de 5 a 15
+  group_by(V4809) %>% # atividade desempenhada
+  summarise(horas_trabalhadas_5_15 = mean(V9058)) %>%
+  ungroup()
+
+tabela2 <- right_join(pt1.tabela2, pt2.tabela2) %>%  # merge das três partes
+  right_join(., pt3.tabela2) %>%
+  rename(atividade = V4809) 
+
+# troca os valores por strings 
+
+tabela2$atividade <- factor(tabela2$atividade, levels = c(1,2,3,4,5,6,7,8,9,10,11,12,13),
+                            labels = c("Agrícola", "Outras atividades industriais", "Indústria de transformação", 
+                                       "Construção", "Comércio e reparação", "Alojamento", "Transporte", "Administração pública",
+                                       "Serviços sociais", "Serviços doméstico", "Outros serviços coletivos", 
+                                       "Outras atividades","Atividades maldefinidas"))
+
+tabela2 %>% 
+  set_names(c("Atividade", "Entre 5 a 10 anos", "Entre 11 a 15 anos", "Entre 5 a 15 anos")) %>% 
+  datatable(options = list(pageLength = 20, dom = "Bfrtip", buttons = c("csv", "pdf")),
+            class = "hover",
+            rownames = F, 
+            extensions = "Buttons") %>% 
+  formatRound(columns = c("Entre 5 a 10 anos", "Entre 11 a 15 anos", "Entre 5 a 15 anos"), digits = 2)
+```
+
+Column {data-width=400}
+-------------
+
+```{r, echo = F}
+dados$atividade <- factor(dados$V4809, levels = c(1,2,3,4,5,6,7,8,9,10,11,12,13),
+                            labels = c("Agrícola", "Outras atividades industriais", 
+                                       "Indústria de transformação", "Construção", "Comércio e reparação", 
+                                       "Alojamento", "Transporte", "Administração pública", "Serviços sociais",
+                                       "Serviços doméstico", "Outros serviços coletivos", "Outras atividades", "Atividades maldefinidas"))
+
+# aumenta número de cores da paleta
+valores <- colorRampPalette(brewer.pal(11, "Spectral"))(13)
+
+ggplotly(
+  dados %>%
+  drop_na(.,atividade) %>% 
+  ggplot(aes(atividade, V9058, fill = atividade)) +
+  labs(y = "Horas habitualmente trabalhadas", x = "Atividade", title = "Horas trabalhadas por atividade") +
+  geom_boxplot() +
+  scale_fill_manual(values = valores) +
+  theme(axis.text.x = element_blank(), legend.title = element_blank(), plot.title = element_text(hjust = 0.5)),
+  width = 1000, height = 500
+)
+
+
+
+```
+
+### 
+
+```{r, echo = F}
+#dados %>% plot_ly(x = ~nmr_irmaos, y = ~V4742, width = 1000, height = 450)
+
+ggplotly(dados %>% filter(!V4742 > 999999999) %>% 
+  ggplot(aes(filhos_domicilio, V4742, color = V4742)) + 
+  labs(x = "filhos no domicílio", y = "rendimento domiciliar per capita", color = "R$") +
+  scale_color_gradient(low = "#8c9dd1", high = "#041e6e") +
+  geom_point(), width = 1000, height = 400)
+```
+
+# Construção
+
+### Processo para tratamento dos dados da PNAD
+
+<br></br>
+
+Esse projeto foi realizado como parte do critério para aprovação na disciplina "Ciência de Dados para Economistas" ministrada pelo professor [Roney Fraga](http://roneyfraga.com/) na Faculdade de Economia da UFMT. O objetivo é aplicar os conhecimentos de `R` adquiridos no curso para limpar e realizar algumas análises em cima de determinada base dados deixando os dados prontos para "uso". No nosso caso utilizamos os microdados da PNAD 2015 e tivemos como base o artigo de [Nascimento e Kassouf (2016)](https://seer.ufrgs.br/AnaliseEconomica/article/view/54855).
+
+Aqui estão dispostos os passos para chegar aos [resultados](#resultados), o código completo está disponível [aqui](https://github.com/matheuscanhete/trabalho-infantil). Primeiro importamos o dicionário da PNAD 2015 para leitura em R disponível no site do [IBGE](ftp://ftp.ibge.gov.br/Trabalho_e_Rendimento/Pesquisa_Nacional_por_Amostra_de_Domicilios_anual/microdados/2015/).
+
+```{r, eval = F, echo = T}
+load("../PNAD/2015/Leitura_em_R_20170517/Leitura em R/dicPNAD2015.Rdata")
+```
+
+Os dados disponíveis no site do IBGE tem um problema no dicionário quanto ao início das variáveis `UF` e `V0102`, ambas iniciam na mesma posição, sendo assim não é possível importar a PNAD diretamente apenas declarando o tamanho das variáveis, a alternativa é eliminar a variável `UF` do dicionário e carregar a PNAD, assim, as duas variáveis serão carregadas como se fossem uma então é só selecionar as duas primeiras posições dessa variável para obter a variável `UF`.
+
+```{r, eval = F, echo = T}
+dicpes2015 <- dicpes2015[dicpes2015$cod2 != "UF",]
+```
+
+```{r, eval = F, echo = T}
+# importa a pnad 2015 passando o tamanho das variáveis no argumento widths e o nome das colunas em col.names
+pnad2015 <- read.fwf("../PNAD/2015/Dados_20170517/Dados/PES2015.txt", 
+         widths = dicpes2015$tamanho2,
+         col.names = dicpes2015$cod2)
+
+# cria a variavel UF 
+pnad2015$uf <- substr(pnad2015$V0102,1,2) 
+```
+
+Como o foco do trabalho é nas pessoas de menos de 15 anos, fazemos esse subset e exportamos os dados em `.rds` para não precisar rodar o código acima de novo e tornar a leitura mais rápida para o R em um futuro próximo. Foi utilizada a função `export` do pacote [rio](https://www.rdocumentation.org/packages/rio/versions/0.5.16) para exportar o objeto.
+
+```{r, eval = F, echo = T}
+pnad2015_15 <- pnad2015[pnad2015$V8005 <= 15,] 
+
+export(pnad2015, "../PNAD/2015/pnad2015.Rds")
+```
+
+A partir daqui se dá a criação das nossas variáveis de interesse, escolaridade da pessoa de referência e número de irmãos do indivíduo, para obter essa última ainda foi necessário criar a variável que nos da o número de filhos no domicílio.
+
+```{r, eval = F, echo = T}
+# as nossas variáveis de interesse
+vars <- c("uf", "V0102", "V0103", "V0301", "V0302", "V8005", "V0401", 
+          "V0404", "V4011", "V0701", "V0704", "V7122", "V7128", "V0713",
+          "V9001", "V9005", "V9029", "V9532", "V9058", "V9067", "V9971", "V9891", 
+          "V9892", "V1272", "V1273", "V4801", "V4805", "V4809", "V4810", "V4812",
+          "V4718", "V4728", "V4729", "V4742", "V4746", "V0403", "V6007", "V6003")
+
+pnad2015_merged <- pnad2015 %>%      
+  filter(V0401 == 1) %>%              # filtrando apenas as pessoas de referencia  
+  group_by(V0102, V0103, V0403) %>%   # agrupando por domicilio (numero de controle, serie e familia)
+  summarise(educacao_pref = max(V6007)) %>%   # cria uma variavel com a educação da pessoa de ref
+  ungroup() %>%                               # desfaz o agrupamento 
+  right_join(.,pnad2015 %>% select(vars))      # fusiona os dois dataframes selecionando apenas as variaveis desejadas da pnad2015
+
+```
+
+Esse processo acima cria o objeto `pnad2015_merged` com a nova variável `educacao_pref` para cada um dos indivíduos em determinado domicílio.
+
+```{r, eval = F, echo = T}
+pnad_broder <- pnad2015_merged %>%      
+  subset(V0401 == 3) %>%                # seleciona apenas pessoas que sao filhos
+  group_by(V0102, V0103, V0403) %>%     # agrupa por domicilio 
+  summarise(filhos_domicilio = n()) %>% # cria uma variavel filhos_domicilio com numero de filhos no domicilio
+  ungroup() %>%                         # desagrupa
+  right_join(.,pnad2015_merged) %>%     # junta os dois dataframes (o agrupado com variavel filho e o da pnad)
+  mutate(., nmr_irmaos =  if_else(V0401 == 3 & filhos_domicilio > 1, filhos_domicilio - 1, 0, missing = NaN)) 
+```
+
+Com a função `mutate` cria-se uma nova variável `nmr_irmaos` (número de irmãos) utilizando o *statement* if/else vetorizado, onde, se há mais de um filho além do indivíduo no domicílio é subtraído um, e caso não tenha filho além deste recebe 0.
+
+Em tese nossos dados estão prontos. Apenas então "subsetamos" o dataset para pessoas entre 5 e 15 anos e exportamos para análise posterior [aqui](#resultado).
+
+```{r, eval = F, echo = T}
+pnad_broder %>% subset(5 <= V8005 & V8005 <= 15) %>% export(., "2015/pes_5_15.Rds")
+```
+
+Pequena olhada na tabela dos indivíduos de 5 a 15 anos de idade já com as variáveis `filhos_domicilio`, `educacao_pref` e `nmr_irmaos`.
+
+```{r tabela, message=F, fig.width=5, fig.cap="Tabelinha"}
+import("2015/pes_5_15.Rds") %>% 
+  head() %>% 
+  kable(., align = "c", "html") %>% 
+  kable_styling(bootstrap_options = c("striped", "hover"),
+                full_width = F,
+                html_font = "Arial") %>% 
+  scroll_box(width = "100%")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
