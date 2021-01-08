@@ -138,33 +138,55 @@ dados$atividade <- factor(dados$V4809, levels = c(1,2,3,4,5,6,7,8,9,10,11,12,13)
                                        "Serviços doméstico", "Outros serviços coletivos", "Outras atividades", "Atividades maldefinidas"))
 
 # aumenta número de cores da paleta
-valores <- colorRampPalette(brewer.pal(11, "Spectral"))(13)
+valores <- colorRampPalette(brewer.pal(11, "Set3"))(13)
 
-ggplotly(
-  dados %>%
+dados %>%
   drop_na(.,atividade) %>% 
-  ggplot(aes(atividade, V9058, fill = atividade)) +
-  labs(y = "Horas habitualmente trabalhadas", x = "Atividade", title = "Horas trabalhadas por atividade") +
-  geom_boxplot() +
-  scale_fill_manual(values = valores) +
-  theme(axis.text.x = element_blank(), legend.title = element_blank(), plot.title = element_text(hjust = 0.5)),
-  width = 1000, height = 500
-)
-
-
-
+  plot_ly(.,
+          type = "box",
+          x = ~atividade, 
+          y = ~V9058,
+          color = ~atividade,
+          colors = valores, 
+          alpha = 1,
+          stroke = ~atividade,
+          strokes = "#000000",
+          alpha_stroke = 0.75,
+          width = 1000,
+          height = 500) %>%
+  layout(
+    title = list(text = "Horas trabalhadas por atividade"),
+    xaxis = list(title = "", showticklabels = F), 
+    yaxis = list(title = "Horas habitualmente trabalhadas")
+    )
 ```
 
 ### 
 
 ```{r, echo = F}
-#dados %>% plot_ly(x = ~nmr_irmaos, y = ~V4742, width = 1000, height = 450)
-
-ggplotly(dados %>% filter(!V4742 > 999999999) %>% 
-  ggplot(aes(filhos_domicilio, V4742, color = V4742)) + 
-  labs(x = "filhos no domicílio", y = "rendimento domiciliar per capita", color = "R$") +
-  scale_color_gradient(low = "#8c9dd1", high = "#041e6e") +
-  geom_point(), width = 1000, height = 400)
+dados %>% 
+  filter(!V4742 > 999999999) %>% 
+  plot_ly(., 
+          type = "scatter",
+          mode = "markers",
+          x = ~filhos_domicilio,
+          y = ~V4742,
+          marker = list(
+          color = ~V4742,
+          colorscale = "Blues",
+          colorbar = list(title = "R$"),
+          opacity = 0.5,
+          size = 8,
+          reversescale = T
+          ),
+          hoverinfo = "text",
+          text = ~paste("filhos:", filhos_domicilio, "<br>rendimento:", paste(V4742, "reais")),
+          width = 1000,
+          height = 400) %>% 
+          layout(
+          xaxis = list(title = "filhos no domicílio"),
+          yaxis = list(title = "rendimento mensal domiciliar per capita")
+          )
 ```
 
 # Construção
