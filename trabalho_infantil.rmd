@@ -6,21 +6,25 @@ output:
   flexdashboard::flex_dashboard:
     theme: cosmo
     css: style.css
+    navbar: 
+      - {title: "🏠", href: "https://matheuscanhete.github.io", align: right}
+    social: [ "menu" ]
     logo: ./fig/logouf.png
+    favicon: ./fig/icon.png 
     orientation: columns
     vertical_layout: fill
 ---
 
 ```{r setup, include = F}
 library(flexdashboard)
-library(highcharter)
 library(tidyverse)
 library(rio)
-library(plotly)
 library(kableExtra)
 library(DT)
 library(knitr)
+library(plotly)
 library(RColorBrewer)
+library(ggtext)
 options(knitr.kable.NA = "--") # troca os NAN do kable
 ```
 
@@ -41,26 +45,28 @@ Column {data-width=350 .tabset}
 # V9001 = trabalhou na semana
 # V9058 = numero de horas habitualmente trabalhada
 # V4809 = grupos atividade principal 
+# V4729 = peso da pessoa
+# V4732 = peso da familia
 
-dados <- import("./2015/pes_5_15.Rds") %>% select(V8005, V0302, V4746, V4812, V4805, V4742,
+dados <- import("./2015/pes_5_15.Rds") %>% select(V4729, V8005, V0302, V4746, V4812, V4805, V4742,
                                                   V9001, V9058, V4809, nmr_irmaos,
                                                   filhos_domicilio, educacao_pref)
 pt1.tabela1 <- dados %>%
   dplyr::filter(V4746 == 1 & V8005 <= 10) %>% # filtrando as crianças ocupadas de 5 a 10
   group_by(V4809, V0302) %>% # atividade desempenhada
-  summarise(percental_5_10 = n()/nrow(.)*100) %>%
+  summarise(percental_5_10 = sum(V4729)/sum(.$V4729)*100) %>% 
   ungroup()
 
 pt2.tabela1 <- dados %>%
   dplyr::filter(V4746 == 1 & V8005 >= 11 & V8005 <= 15) %>% # filtrando as crianças ocupadas de 11 a 15
   group_by(V4809, V0302) %>% # atividade desempenhada
-  summarise(percental_11_15 = n()/nrow(.)*100) %>%
+  summarise(percental_11_15 = sum(V4729)/sum(.$V4729)*100) %>%
   ungroup()
 
 pt3.tabela1 <- dados %>%
   dplyr::filter(V4746 == 1) %>% # filtrando as crianças ocupadas de 5 a 15
   group_by(V4809, V0302) %>% # atividade desempenhada
-  summarise(percental_5_15 = n()/nrow(.)*100) %>%
+  summarise(percental_5_15 = sum(V4729)/sum(.$V4729)*100) %>%
   ungroup()                                                  
 
 tabela1 <- right_join(pt1.tabela1, pt2.tabela1) %>%  # merge das três partes
@@ -78,7 +84,7 @@ tabela1$atividade <- factor(tabela1$atividade, levels = c(1,2,3,4,5,6,7,8,9,10,1
 
 tabela1 %>% 
   set_names(c("Atividade","Sexo", "Entre 5 a 10 anos", "Entre 11 a 15 anos", "Entre 5 a 15 anos")) %>% 
-  datatable(options = list(pageLength = 20, dom = "Bfrtip", buttons = c("csv", "pdf")),
+  datatable(options = list(pageLength = 20, scrollY = TRUE, dom = "Bfrtip", buttons = c("csv", "pdf")),
             class = "hover",
             rownames = F, 
             extensions = "Buttons") %>% 
@@ -91,19 +97,19 @@ tabela1 %>%
 pt1.tabela2 <- dados %>%
   dplyr::filter(V4746 == 1 & V8005 <= 10) %>% # filtrando as crianças ocupadas de 5 a 10
   group_by(V4809) %>% # atividade desempenhada
-  summarise(horas_trabalhadas_5_10 = mean(V9058)) %>%
+  summarise(horas_trabalhadas_5_10 = weighted.mean(V9058, V4729)) %>%
   ungroup()
 
 pt2.tabela2 <- dados %>%
   dplyr::filter(V4746 == 1 & V8005 >= 11 & V8005 <= 15) %>% # filtrando as crianças ocupadas de 11 a 15
   group_by(V4809) %>% # atividade desempenhada
-  summarise(horas_trabalhadas_11_15 = mean(V9058)) %>%
+  summarise(horas_trabalhadas_11_15 = weighted.mean(V9058, V4729)) %>%
   ungroup()
 
 pt3.tabela2 <- dados %>%
   dplyr::filter(V4746 == 1) %>% # filtrando as crianças ocupadas de 5 a 15
   group_by(V4809) %>% # atividade desempenhada
-  summarise(horas_trabalhadas_5_15 = mean(V9058)) %>%
+  summarise(horas_trabalhadas_5_15 = weighted.mean(V9058, V4729)) %>%
   ungroup()
 
 tabela2 <- right_join(pt1.tabela2, pt2.tabela2) %>%  # merge das três partes
@@ -120,17 +126,17 @@ tabela2$atividade <- factor(tabela2$atividade, levels = c(1,2,3,4,5,6,7,8,9,10,1
 
 tabela2 %>% 
   set_names(c("Atividade", "Entre 5 a 10 anos", "Entre 11 a 15 anos", "Entre 5 a 15 anos")) %>% 
-  datatable(options = list(pageLength = 20, dom = "Bfrtip", buttons = c("csv", "pdf")),
+  datatable(options = list(pageLength = 20, scrollY = TRUE, dom = "Bfrtip", buttons = c("csv", "pdf")),
             class = "hover",
             rownames = F, 
             extensions = "Buttons") %>% 
   formatRound(columns = c("Entre 5 a 10 anos", "Entre 11 a 15 anos", "Entre 5 a 15 anos"), digits = 2)
 ```
 
-Column {data-width=400}
+Column {data-width=350}
 -------------
 
-```{r, echo = F}
+```{r, echo = F, fig.width = 10}
 dados$atividade <- factor(dados$V4809, levels = c(1,2,3,4,5,6,7,8,9,10,11,12,13),
                             labels = c("Agrícola", "Outras atividades industriais", 
                                        "Indústria de transformação", "Construção", "Comércio e reparação", 
@@ -142,51 +148,47 @@ valores <- colorRampPalette(brewer.pal(11, "Set3"))(13)
 
 dados %>%
   drop_na(.,atividade) %>% 
+  select(atividade, V9058, V4729) %>%
   plot_ly(.,
-          type = "box",
-          x = ~atividade, 
-          y = ~V9058,
-          color = ~atividade,
-          colors = valores, 
-          alpha = 1,
-          stroke = ~atividade,
-          strokes = "#000000",
-          alpha_stroke = 0.75,
-          width = 1000,
-          height = 500) %>%
-  layout(
+    type = "box",
+    x = ~atividade,
+    y = ~V9058,
+    color = ~atividade,
+    colors = valores,
+    alpha = 1,
+    strokes = "#000000",
+    stroke = ~atividade,
+    alpha_stroke = .75,
+    height = 300
+  ) %>% 
+  plotly::layout(
     title = list(text = "Horas trabalhadas por atividade"),
     xaxis = list(title = "", showticklabels = F), 
-    yaxis = list(title = "Horas habitualmente trabalhadas")
-    )
+    yaxis = list(title = "Horas habitualmente trabalhadas"),
+    autosize = T
+  )
 ```
 
 ### 
 
-```{r, echo = F}
+```{r, echo = F, fig.width = 12}
 dados %>% 
-  filter(!V4742 > 999999999) %>% 
-  plot_ly(., 
-          type = "scatter",
-          mode = "markers",
-          x = ~filhos_domicilio,
-          y = ~V4742,
-          marker = list(
-          color = ~V4742,
-          colorscale = "Blues",
-          colorbar = list(title = "R$"),
-          opacity = 0.5,
-          size = 8,
-          reversescale = T
-          ),
-          hoverinfo = "text",
-          text = ~paste("filhos:", filhos_domicilio, "<br>rendimento:", paste(V4742, "reais")),
-          width = 1000,
-          height = 400) %>% 
-          layout(
-          xaxis = list(title = "filhos no domicílio"),
-          yaxis = list(title = "rendimento mensal domiciliar per capita")
-          )
+  filter(!V4742 > 999999999) %>%
+  group_by(filhos_domicilio) %>% 
+  summarise(media = weighted.mean(V4742, V4729)) %>%
+  plot_ly(.,
+    type = "bar",
+    x = ~filhos_domicilio,
+    y = ~media,
+    hoverinfo = "text",
+    textposition = "none",
+    text = ~paste("filhos:", filhos_domicilio, "<br>rendimento médio:", paste("R$", round(media, 2), "reais"))
+  ) %>% 
+  layout(
+    xaxis = list(title = "filhos no domicílio"),
+    yaxis = list(title = "rendimento mensal domiciliar per capita médio"),
+    autosize = T
+    )
 ```
 
 # Construção
@@ -243,7 +245,6 @@ pnad2015_merged <- pnad2015 %>%
   summarise(educacao_pref = max(V6007)) %>%   # cria uma variavel com a educação da pessoa de ref
   ungroup() %>%                               # desfaz o agrupamento 
   right_join(.,pnad2015 %>% select(vars))      # fusiona os dois dataframes selecionando apenas as variaveis desejadas da pnad2015
-
 ```
 
 Esse processo acima cria o objeto `pnad2015_merged` com a nova variável `educacao_pref` para cada um dos indivíduos em determinado domicílio.
@@ -277,27 +278,3 @@ import("2015/pes_5_15.Rds") %>%
                 html_font = "Arial") %>% 
   scroll_box(width = "100%")
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
